@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบบันทึกรายรับ-รายจ่าย (Smart Wealth Tracker)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts: Kanit -->
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Kanit', 'sans-serif'],
+                    },
+                    colors: {
+                        income: {
+                            DEFAULT: '#10B981',
+                            light: '#D1FAE5',
+                            dark: '#059669'
+                        },
+                        expense: {
+                            DEFAULT: '#EF4444',
+                            light: '#FEE2E2',
+                            dark: '#DC2626'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: #F3F4F6;
+        }
+        /* Glassmorphism subtle effects */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(229, 231, 235, 0.8);
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="text-gray-800 min-h-screen pb-12">
+
+    <!-- Header / Navbar -->
+    <header class="bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-700 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="p-2.5 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-inner">
+                    <i class="fa-solid fa-wallet text-2xl text-yellow-300"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold tracking-wide">Smart Tracker</h1>
+                    <p class="text-xs text-emerald-100 font-light">บันทึกรายรับ-รายจ่าย ประจำวัน</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+                <!-- Admin Status Badge & Toggle Button -->
+                <div id="adminBadge" class="hidden items-center px-3 py-1 bg-amber-400/20 border border-amber-300 text-yellow-200 rounded-xl text-xs font-semibold space-x-1.5 animate-pulse">
+                    <i class="fa-solid fa-user-shield"></i>
+                    <span>Admin Mode</span>
+                </div>
+
+                <button id="adminToggleBtn" onclick="openAdminModal()" class="text-xs sm:text-sm bg-white/10 hover:bg-white/20 border border-white/30 text-white px-3.5 py-2 rounded-xl transition flex items-center space-x-2 shadow-sm">
+                    <i class="fa-solid fa-lock"></i>
+                    <span id="adminBtnText" class="hidden sm:inline">เข้าสู่ระบบแอดมิน</span>
+                </button>
+
+                <button onclick="exportCSV()" class="text-xs sm:text-sm bg-white/10 hover:bg-white/20 border border-white/30 text-white px-3.5 py-2 rounded-xl transition flex items-center space-x-2 shadow-sm">
+                    <i class="fa-solid fa-file-csv"></i>
+                    <span class="hidden sm:inline">ส่งออก CSV</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        
+        <!-- Admin Panel Section (Only visible in Admin Mode) -->
+        <div id="adminPanel" class="hidden mb-8 glass-card rounded-3xl p-6 border-2 border-amber-300/60 shadow-lg bg-gradient-to-r from-amber-500/5 via-orange-500/5 to-amber-500/5">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 pb-4 border-b border-amber-200/60 gap-3">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2.5 bg-amber-500 text-white rounded-2xl shadow-sm">
+                        <i class="fa-solid fa-sliders text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-800">แผงควบคุมแอดมิน (Admin Control Panel)</h2>
+                        <p class="text-xs text-amber-700 font-light">จัดการหมวดหมู่ ควบคุมข้อมูล และการตั้งค่าขั้นสูง</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="loadSampleData()" class="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 px-3 py-2 rounded-xl font-medium transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span>โหลดข้อมูลตัวอย่าง</span>
+                    </button>
+                    <button onclick="confirmClearAll()" class="text-xs bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200 px-3 py-2 rounded-xl font-medium transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <span>รีเซ็ตข้อมูลทั้งหมด</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Category Management Subpanel -->
+            <div>
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-sm font-bold text-gray-700 flex items-center">
+                        <i class="fa-solid fa-tags text-amber-500 mr-2"></i>
+                        จัดการหมวดหมู่รายรับ-รายจ่าย
+                    </h3>
+                    <button onclick="openCategoryModal()" class="text-xs bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-xl transition flex items-center space-x-1 shadow-sm font-medium">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>เพิ่มหมวดหมู่ใหม่</span>
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Income Categories List -->
+                    <div class="bg-white/80 p-4 rounded-2xl border border-gray-200">
+                        <h4 class="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2 flex items-center">
+                            <i class="fa-solid fa-circle-plus mr-1.5"></i> หมวดหมู่รายรับ
+                        </h4>
+                        <div id="adminIncomeCats" class="flex flex-wrap gap-2">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+                    <!-- Expense Categories List -->
+                    <div class="bg-white/80 p-4 rounded-2xl border border-gray-200">
+                        <h4 class="text-xs font-bold text-rose-600 uppercase tracking-wider mb-2 flex items-center">
+                            <i class="fa-solid fa-circle-minus mr-1.5"></i> หมวดหมู่รายจ่าย
+                        </h4>
+                        <div id="adminExpenseCats" class="flex flex-wrap gap-2">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Cards: Overview Summary -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+            <!-- Balance Card -->
+            <div class="glass-card rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition relative overflow-hidden">
+                <div class="absolute -right-4 -bottom-4 opacity-10 text-indigo-600">
+                    <i class="fa-solid fa-scale-balanced text-9xl"></i>
+                </div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-gray-500">คงเหลือสุทธิ</span>
+                    <span class="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><i class="fa-solid fa-vault"></i></span>
+                </div>
+                <div id="totalBalance" class="text-3xl font-bold text-gray-900 tracking-tight">฿0.00</div>
+                <div class="mt-2 text-xs text-gray-400 font-light">สถานะทางการเงินปัจจุบัน</div>
+            </div>
+
+            <!-- Income Card -->
+            <div class="glass-card rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition relative overflow-hidden">
+                <div class="absolute -right-4 -bottom-4 opacity-10 text-emerald-600">
+                    <i class="fa-solid fa-arrow-trend-up text-9xl"></i>
+                </div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-gray-500">รายรับทั้งหมด</span>
+                    <span class="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><i class="fa-solid fa-arrow-down-left"></i></span>
+                </div>
+                <div id="totalIncome" class="text-3xl font-bold text-emerald-600 tracking-tight">+฿0.00</div>
+                <div class="mt-2 text-xs text-emerald-600/70 font-light"><i class="fa-solid fa-circle-up mr-1"></i>เงินได้รวม</div>
+            </div>
+
+            <!-- Expense Card -->
+            <div class="glass-card rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition relative overflow-hidden">
+                <div class="absolute -right-4 -bottom-4 opacity-10 text-rose-600">
+                    <i class="fa-solid fa-arrow-trend-down text-9xl"></i>
+                </div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-gray-500">รายจ่ายทั้งหมด</span>
+                    <span class="p-2 bg-rose-50 text-rose-600 rounded-xl"><i class="fa-solid fa-arrow-up-right"></i></span>
+                </div>
+                <div id="totalExpense" class="text-3xl font-bold text-rose-600 tracking-tight">-฿0.00</div>
+                <div class="mt-2 text-xs text-rose-600/70 font-light"><i class="fa-solid fa-circle-down mr-1"></i>ค่าใช้จ่ายรวม</div>
+            </div>
+        </div>
+
+        <!-- Middle Content Grid: Form & Chart -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
+            
+            <!-- Left Side: Add Transaction Form (5 cols) -->
+            <div class="lg:col-span-5">
+                <div class="glass-card rounded-3xl p-6 shadow-sm border border-gray-100">
+                    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                        <i class="fa-solid fa-square-plus text-indigo-600 mr-2.5 text-xl"></i>
+                        บันทึกรายการใหม่
+                    </h2>
+
+                    <form id="transactionForm" onsubmit="addTransaction(event)" class="space-y-4">
+                        <!-- Transaction Type (Radio Buttons) -->
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">ประเภทรายการ</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="type" value="expense" checked class="peer hidden" onchange="updateCategories()">
+                                    <div class="py-2.5 px-4 text-center rounded-xl border border-gray-200 peer-checked:border-rose-500 peer-checked:bg-rose-50 peer-checked:text-rose-600 text-gray-600 font-medium transition flex items-center justify-center space-x-2">
+                                        <i class="fa-solid fa-circle-minus"></i>
+                                        <span>รายจ่าย</span>
+                                    </div>
+                                </label>
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="type" value="income" class="peer hidden" onchange="updateCategories()">
+                                    <div class="py-2.5 px-4 text-center rounded-xl border border-gray-200 peer-checked:border-emerald-500 peer-checked:bg-emerald-50 peer-checked:text-emerald-600 text-gray-600 font-medium transition flex items-center justify-center space-x-2">
+                                        <i class="fa-solid fa-circle-plus"></i>
+                                        <span>รายรับ</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Amount -->
+                        <div>
+                            <label for="amount" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">จำนวนเงิน (บาท)</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 font-medium">฿</span>
+                                <input type="number" step="0.01" id="amount" required placeholder="0.00" class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-lg font-semibold text-gray-800">
+                            </div>
+                        </div>
+
+                        <!-- Category & Date Row -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <!-- Category Select -->
+                            <div>
+                                <label for="category" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">หมวดหมู่</label>
+                                <select id="category" required class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white text-gray-700">
+                                    <!-- Populated dynamically via JS -->
+                                </select>
+                            </div>
+
+                            <!-- Date Input -->
+                            <div>
+                                <label for="date" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">วันที่</label>
+                                <input type="date" id="date" required class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-700">
+                            </div>
+                        </div>
+
+                        <!-- Note / Description -->
+                        <div>
+                            <label for="note" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">หมายเหตุ / รายละเอียดเพิ่มเติม</label>
+                            <input type="text" id="note" placeholder="เช่น ค่าอาหารกลางวัน, เงินเดือน" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-700">
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button type="submit" id="submitFormBtn" class="w-full py-3 bg-gradient-to-r from-indigo-600 to-emerald-600 hover:from-indigo-700 hover:to-emerald-700 text-white font-semibold rounded-xl shadow-md transition transform active:scale-[0.99] flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-save"></i>
+                            <span id="submitBtnText">บันทึกข้อมูล</span>
+                        </button>
+                        <button type="button" id="cancelEditBtn" onclick="resetForm()" class="hidden w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-xl transition text-xs">
+                            ยกเลิกการแก้ไข
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Right Side: Analytics / Charts (7 cols) -->
+            <div class="lg:col-span-7">
+                <div class="glass-card rounded-3xl p-6 shadow-sm border border-gray-100 h-full flex flex-col justify-between">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+                        <h2 class="text-lg font-bold text-gray-800 flex items-center">
+                            <i class="fa-solid fa-chart-pie text-indigo-600 mr-2.5 text-xl"></i>
+                            สัดส่วนค่าใช้จ่ายตามหมวดหมู่
+                        </h2>
+                        <span class="text-xs font-normal text-gray-400 bg-gray-100 px-3 py-1 rounded-full">เฉพาะรายจ่าย</span>
+                    </div>
+
+                    <!-- Chart Container -->
+                    <div class="relative flex-grow flex items-center justify-center my-2" style="min-height: 260px;">
+                        <canvas id="expenseChart"></canvas>
+                        <div id="noChartData" class="hidden absolute inset-0 flex flex-col items-center justify-center text-gray-400 bg-white/80 rounded-2xl">
+                            <i class="fa-solid fa-chart-bar text-4xl mb-2 text-gray-300"></i>
+                            <p class="text-sm">ยังไม่มีข้อมูลรายจ่ายสำหรับสร้างกราฟ</p>
+                        </div>
+                    </div>
+
+                    <!-- Category Quick Legend Bar (Optional dynamic info) -->
+                    <div id="chartSummaryFooter" class="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500 flex justify-between items-center">
+                        <span>ช่วยให้คุณวางแผนการเงินได้ดียิ่งขึ้น</span>
+                        <span class="font-medium text-indigo-600">อัปเดตเรียลไทม์</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Section: Transactions History Table -->
+        <div class="glass-card rounded-3xl p-6 shadow-sm border border-gray-100">
+            <!-- Header Controls -->
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-gray-800 flex items-center">
+                        <i class="fa-solid fa-clock-rotate-left text-indigo-600 mr-2.5 text-xl"></i>
+                        ประวัติรายการทั้งหมด
+                    </h2>
+                    <p class="text-xs text-gray-400 font-light mt-0.5">รายการทั้งหมดที่บันทึกไว้ในระบบ</p>
+                </div>
+
+                <!-- Filters & Search -->
+                <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    <!-- Search Input -->
+                    <div class="relative flex-grow sm:flex-grow-0">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-gray-400 text-xs"></i>
+                        <input type="text" id="searchInput" oninput="renderTransactions()" placeholder="ค้นหาโน้ต/หมวดหมู่..." class="pl-8 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-48">
+                    </div>
+
+                    <!-- Type Filter -->
+                    <select id="filterType" onchange="renderTransactions()" class="px-3 py-2 text-xs sm:text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-gray-700">
+                        <option value="all">ทุกประเภท</option>
+                        <option value="income">เฉพาะรายรับ</option>
+                        <option value="expense">เฉพาะรายจ่าย</option>
+                    </select>
+
+                    <!-- Category Filter -->
+                    <select id="filterCategory" onchange="renderTransactions()" class="px-3 py-2 text-xs sm:text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-gray-700">
+                        <option value="all">ทุกหมวดหมู่</option>
+                    </select>
+
+                    <!-- Clear All Data Button -->
+                    <button onclick="confirmClearAll()" class="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition text-xs flex items-center space-x-1" title="ล้างข้อมูลทั้งหมด">
+                        <i class="fa-solid fa-trash-can text-sm"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table Responsive Wrapper -->
+            <div class="overflow-x-auto rounded-2xl border border-gray-100">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50/80 text-gray-500 text-xs font-semibold uppercase tracking-wider">
+                            <th class="py-3.5 px-4">วันที่</th>
+                            <th class="py-3.5 px-4">ประเภท</th>
+                            <th class="py-3.5 px-4">หมวดหมู่</th>
+                            <th class="py-3.5 px-4">รายละเอียด / หมายเหตุ</th>
+                            <th class="py-3.5 px-4 text-right">จำนวนเงิน</th>
+                            <th class="py-3.5 px-4 text-center">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionList" class="divide-y divide-gray-100 text-sm">
+                        <!-- Items rendered via JavaScript -->
+                    </tbody>
+                </table>
+                
+                <!-- Empty State -->
+                <div id="emptyState" class="hidden py-12 text-center text-gray-400">
+                    <i class="fa-solid fa-receipt text-5xl mb-3 text-gray-300"></i>
+                    <p class="text-base font-medium">ยังไม่มีรายการบันทึก</p>
+                    <p class="text-xs text-gray-400 mt-1">เริ่มบันทึกรายรับ-รายจ่ายของคุณได้จากฟอร์มด้านบน</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Custom Modal / Notification Box -->
+    <div id="confirmModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-gray-100 text-center transform transition-all">
+            <div class="w-12 h-12 bg-rose-100 text-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="text-lg font-bold text-gray-800 mb-2">ยืนยันการลบข้อมูล</h3>
+            <p class="text-xs text-gray-500 mb-6">คุณแน่ใจหรือไม่ว่าต้องการลบรายการทั้งหมด? ข้อมูลที่ลบจะไม่สามารถกู้คืนได้</p>
+            <div class="flex space-x-3">
+                <button onclick="closeModal()" class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl text-sm transition">ยกเลิก</button>
+                <button onclick="executeClearAll()" class="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-xl text-sm transition shadow-md">ลบทั้งหมด</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // Category Definitions with Icons & Colors
+        const categories = {
+            expense: [
+                { id: 'food', name: 'อาหาร & เครื่องดื่ม', icon: 'fa-utensils', color: '#EF4444' },
+                { id: 'transport', name: 'การเดินทาง / ค่าน้ำมัน', icon: 'fa-car', color: '#F59E0B' },
+                { id: 'shopping', name: 'ช้อปปิ้ง & ของใช้', icon: 'fa-bag-shopping', color: '#EC4899' },
+                { id: 'bills', name: 'ค่าน้ำ/ค่าไฟ/เน็ต', icon: 'fa-file-invoice-dollar', color: '#3B82F6' },
+                { id: 'entertainment', name: 'ความบันเทิง & ท่องเที่ยว', icon: 'fa-gamepad', color: '#8B5CF6' },
+                { id: 'health', name: 'สุขภาพ & พยาบาล', icon: 'fa-heart-pulse', color: '#10B981' },
+                { id: 'other_expense', name: 'ค่าใช้จ่ายอื่นๆ', icon: 'fa-ellipsis', color: '#6B7280' }
+            ],
+            income: [
+                { id: 'salary', name: 'เงินเดือน / ค่าจ้าง', icon: 'fa-money-bill-wave', color: '#10B981' },
+                { id: 'business', name: 'ธุรกิจส่วนตัว / ขายของ', icon: 'fa-store', color: '#06B6D4' },
+                { id: 'investment', name: 'การลงทุน / ดอกเบี้ย', icon: 'fa-chart-line', color: '#8B5CF6' },
+                { id: 'bonus', name: 'โบนัส / เงินพิเศษ', icon: 'fa-gift', color: '#F59E0B' },
+                { id: 'other_income', name: 'รายรับอื่นๆ', icon: 'fa-wallet', color: '#64748B' }
+            ]
+        };
+
+        // State Management
+        let transactions = [];
+        let expenseChart = null;
+
+        // Initialize Application
+        window.onload = function() {
+            // Set default date to today
+            document.getElementById('date').valueAsDate = new Date();
+            
+            // Load saved data from localStorage
+            loadData();
+            
+            // Populate category select options
+            updateCategories();
+            populateFilterCategories();
+
+            // Initialize Chart
+            initChart();
+
+            // Render Dashboard & List
+            updateDashboard();
+            renderTransactions();
+        };
+
+        // Save & Load LocalStorage
+        function saveData() {
+            localStorage.setItem('smart_tracker_transactions', JSON.stringify(transactions));
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('smart_tracker_transactions');
+            if (saved) {
+                try {
+                    transactions = JSON.parse(saved);
+                } catch(e) {
+                    transactions = [];
+                }
+            } else {
+                // Initial sample data if completely empty
+                transactions = [
+                    { id: '1', type: 'income', amount: 35000, category: 'salary', note: 'เงินเดือนประจำเดือน', date: getFormattedDate(0) },
+                    { id: '2', type: 'expense', amount: 150, category: 'food', note: 'ข้าวผัดและกาแฟ', date: getFormattedDate(0) },
+                    { id: '3', type: 'expense', amount: 1200, category: 'bills', note: 'ค่าอินเทอร์เน็ตบ้าน', date: getFormattedDate(1) }
+                ];
+                saveData();
+            }
+        }
+
+        function getFormattedDate(daysAgo = 0) {
+            const d = new Date();
+            d.setDate(d.getDate() - daysAgo);
+            return d.toISOString().split('T')[0];
+        }
+
+        // Update category dropdown based on type selection
+        function updateCategories() {
+            const type = document.querySelector('input[name="type"]:checked').value;
+            const categorySelect = document.getElementById('category');
+            categorySelect.innerHTML = '';
+
+            categories[type].forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.id;
+                option.textContent = cat.name;
+                categorySelect.appendChild(option);
+            });
+        }
+
+        // Populate filter dropdown with all unique categories
+        function populateFilterCategories() {
+            const filterCat = document.getElementById('filterCategory');
+            filterCat.innerHTML = '<option value="all">ทุกหมวดหมู่</option>';
+
+            const allCats = [...categories.expense, ...categories.income];
+            allCats.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.id;
+                option.textContent = cat.name;
+                filterCat.appendChild(option);
+            });
+        }
+
+        // Add Transaction
+        function addTransaction(e) {
+            e.preventDefault();
+
+            const type = document.querySelector('input[name="type"]:checked').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const category = document.getElementById('category').value;
+            const date = document.getElementById('date').value;
+            const note = document.getElementById('note').value.trim();
+
+            if (!amount || amount <= 0 || !date) return;
+
+            const newTransaction = {
+                id: Date.now().toString(),
+                type,
+                amount,
+                category,
+                date,
+                note: note || (type === 'income' ? 'รายรับ' : 'รายจ่าย')
+            };
+
+            transactions.unshift(newTransaction);
+            saveData();
+            
+            // Reset Form Note & Amount
+            document.getElementById('amount').value = '';
+            document.getElementById('note').value = '';
+
+            // Update UI
+            updateDashboard();
+            renderTransactions();
+        }
+
+        // Delete Transaction
+        function deleteTransaction(id) {
+            transactions = transactions.filter(t => t.id !== id);
+            saveData();
+            updateDashboard();
+            renderTransactions();
+        }
+
+        // Calculate Totals & Update Dashboard UI
+        function updateDashboard() {
+            let income = 0;
+            let expense = 0;
+
+            transactions.forEach(t => {
+                if (t.type === 'income') income += t.amount;
+                if (t.type === 'expense') expense += t.amount;
+            });
+
+            const balance = income - expense;
+
+            // Animate / Update Text Display
+            document.getElementById('totalBalance').textContent = `฿${balance.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+            document.getElementById('totalIncome').textContent = `+฿${income.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+            document.getElementById('totalExpense').textContent = `-฿${expense.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+
+            // Change balance color if negative
+            const balanceEl = document.getElementById('totalBalance');
+            if (balance < 0) {
+                balanceEl.classList.remove('text-gray-900', 'text-emerald-600');
+                balanceEl.classList.add('text-rose-600');
+            } else {
+                balanceEl.classList.remove('text-rose-600');
+                balanceEl.classList.add('text-gray-900');
+            }
+
+            // Update Chart Data
+            updateChart();
+        }
+
+        // Render Transactions List with Filters
+        function renderTransactions() {
+            const listEl = document.getElementById('transactionList');
+            const emptyEl = document.getElementById('emptyState');
+            const filterType = document.getElementById('filterType').value;
+            const filterCategory = document.getElementById('filterCategory').value;
+            const searchText = document.getElementById('searchInput').value.toLowerCase();
+
+            listEl.innerHTML = '';
+
+            // Filter logic
+            const filtered = transactions.filter(t => {
+                const matchType = filterType === 'all' || t.type === filterType;
+                const matchCategory = filterCategory === 'all' || t.category === filterCategory;
+                const matchSearch = t.note.toLowerCase().includes(searchText) || getCategoryName(t.category).toLowerCase().includes(searchText);
+                return matchType && matchCategory && matchSearch;
+            });
+
+            if (filtered.length === 0) {
+                emptyEl.classList.remove('hidden');
+                return;
+            } else {
+                emptyEl.classList.add('hidden');
+            }
+
+            filtered.forEach(item => {
+                const catObj = getCategoryObject(item.category);
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50/60 transition group';
+
+                const isIncome = item.type === 'income';
+                const amountFormatted = `${isIncome ? '+' : '-'}฿${item.amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+
+                tr.innerHTML = `
+                    <td class="py-3.5 px-4 text-gray-500 whitespace-nowrap text-xs sm:text-sm">
+                        ${formatThaiDate(item.date)}
+                    </td>
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${isIncome ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                            <i class="fa-solid ${isIncome ? 'fa-arrow-down-left mr-1.5' : 'fa-arrow-up-right mr-1.5'} text-[10px]"></i>
+                            ${isIncome ? 'รายรับ' : 'รายจ่าย'}
+                        </span>
+                    </td>
+                    <td class="py-3.5 px-4 text-gray-700 whitespace-nowrap">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-7 h-7 rounded-lg flex items-center justify-center text-xs text-white" style="background-color: ${catObj.color || '#6B7280'}">
+                                <i class="fa-solid ${catObj.icon || 'fa-circle'}"></i>
+                            </span>
+                            <span class="font-medium text-xs sm:text-sm">${catObj.name || item.category}</span>
+                        </div>
+                    </td>
+                    <td class="py-3.5 px-4 text-gray-600 max-w-xs truncate text-xs sm:text-sm">
+                        ${escapeHtml(item.note)}
+                    </td>
+                    <td class="py-3.5 px-4 text-right font-semibold whitespace-nowrap text-xs sm:text-sm ${isIncome ? 'text-emerald-600' : 'text-rose-600'}">
+                        ${amountFormatted}
+                    </td>
+                    <td class="py-3.5 px-4 text-center whitespace-nowrap">
+                        <button onclick="deleteTransaction('${item.id}')" class="text-gray-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition" title="ลบรายการ">
+                            <i class="fa-regular fa-trash-can text-sm"></i>
+                        </button>
+                    </td>
+                `;
+                listEl.appendChild(tr);
+            });
+        }
+
+        // Helper Functions
+        function getCategoryObject(catId) {
+            const all = [...categories.expense, ...categories.income];
+            return all.find(c => c.id === catId) || { name: catId, icon: 'fa-tag', color: '#6B7280' };
+        }
+
+        function getCategoryName(catId) {
+            return getCategoryObject(catId).name;
+        }
+
+        function formatThaiDate(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+            return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear() + 543}`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Chart.js Implementation
+        function initChart() {
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            expenseChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [],
+                        borderWidth: 2,
+                        borderColor: '#ffffff',
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    family: 'Kanit',
+                                    size: 12
+                                },
+                                padding: 16,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw || 0;
+                                    return ` ${context.label}: ฿${value.toLocaleString('th-TH', {minimumFractionDigits: 2})}`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '65%'
+                }
+            });
+        }
+
+        function updateChart() {
+            const expenseTotals = {};
+
+            // Calculate expense per category
+            transactions.filter(t => t.type === 'expense').forEach(t => {
+                if (expenseTotals[t.category]) {
+                    expenseTotals[t.category] += t.amount;
+                } else {
+                    expenseTotals[t.category] = t.amount;
+                }
+            });
+
+            const labels = [];
+            const data = [];
+            const bgColors = [];
+
+            Object.keys(expenseTotals).forEach(catId => {
+                const catObj = getCategoryObject(catId);
+                labels.push(catObj.name);
+                data.push(expenseTotals[catId]);
+                bgColors.push(catObj.color);
+            });
+
+            const noDataEl = document.getElementById('noChartData');
+
+            if (data.length === 0) {
+                noDataEl.classList.remove('hidden');
+                expenseChart.data.labels = [];
+                expenseChart.data.datasets[0].data = [];
+                expenseChart.update();
+            } else {
+                noDataEl.classList.add('hidden');
+                expenseChart.data.labels = labels;
+                expenseChart.data.datasets[0].data = data;
+                expenseChart.data.datasets[0].backgroundColor = bgColors;
+                expenseChart.update();
+            }
+        }
+
+        // Export to CSV Function
+        function exportCSV() {
+            if (transactions.length === 0) {
+                alert('ไม่มีข้อมูลสำหรับส่งออก');
+                return;
+            }
+
+            let csvContent = "\uFEFFวันที่,ประเภท,หมวดหมู่,หมายเหตุ,จำนวนเงิน (บาท)\n";
+            transactions.forEach(t => {
+                const typeText = t.type === 'income' ? 'รายรับ' : 'รายจ่าย';
+                const catText = getCategoryName(t.category);
+                const noteText = `"${(t.note || '').replace(/"/g, '""')}"`;
+                csvContent += `${t.date},${typeText},${catText},${noteText},${t.amount}\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `income_expense_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Clear All Modal Handler
+        function confirmClearAll() {
+            if (transactions.length === 0) return;
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('confirmModal').classList.add('hidden');
+        }
+
+        function executeClearAll() {
+            transactions = [];
+            saveData();
+            updateDashboard();
+            renderTransactions();
+            closeModal();
+        }
+    </script>
+</body>
+</html>
+    <!-- Admin Login Modal -->
+    <div id="adminModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-gray-100 text-center">
+            <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-3 text-xl">
+                <i class="fa-solid fa-user-shield"></i>
+            </div>
+            <h3 class="text-lg font-bold text-gray-800 mb-1">เข้าสู่โหมดแอดมิน</h3>
+            <p class="text-xs text-gray-500 mb-4">ใส่รหัสผ่านเพื่อสิทธิ์แอดมิน <br><span class="text-amber-600 font-medium">(รหัสผ่านเริ่มต้น: 123456)</span></p>
+            
+            <form onsubmit="handleAdminLogin(event)" class="space-y-4">
+                <input type="password" id="adminPassword" placeholder="กรอกรหัสผ่าน..." required class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500 text-center text-lg tracking-widest">
+                <div class="flex space-x-3">
+                    <button type="button" onclick="closeAdminModal()" class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl text-sm transition">ยกเลิก</button>
+                    <button type="submit" class="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl text-sm transition shadow-md">ยืนยัน</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add/Edit Category Modal -->
+    <div id="categoryModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-gray-100">
+            <h3 id="catModalTitle" class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fa-solid fa-tags text-amber-500 mr-2"></i>
+                <span>เพิ่มหมวดหมู่ใหม่</span>
+            </h3>
+
+            <form onsubmit="saveCategory(event)" class="space-y-4">
+                <input type="hidden" id="editCatId">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">ประเภท</label>
+                    <select id="catType" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white text-gray-700 text-sm">
+                        <option value="expense">รายจ่าย</option>
+                        <option value="income">รายรับ</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">ชื่อหมวดหมู่</label>
+                    <input type="text" id="catName" required placeholder="เช่น ค่าที่พัก, รายได้เสริม" class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">ไอคอน (FontAwesome)</label>
+                        <select id="catIcon" class="w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm">
+                            <option value="fa-tag">🏷️ แท็ก (Tag)</option>
+                            <option value="fa-utensils">🍽️ อาหาร</option>
+                            <option value="fa-car">🚗 เดินทาง</option>
+                            <option value="fa-house">🏠 บ้าน/ที่พัก</option>
+                            <option value="fa-bag-shopping">🛍️ ช้อปปิ้ง</option>
+                            <option value="fa-gamepad">🎮 ความบันเทิง</option>
+                            <option value="fa-heart-pulse">🏥 สุขภาพ</option>
+                            <option value="fa-graduation-cap">🎓 การศึกษา</option>
+                            <option value="fa-money-bill-wave">💵 เงินเดือน</option>
+                            <option value="fa-chart-line">📈 การลงทุน</option>
+                            <option value="fa-gift">🎁 ของขวัญ/โบนัส</option>
+                            <option value="fa-store">🏪 ร้านค้า</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">สีประจำหมวดหมู่</label>
+                        <input type="color" id="catColor" value="#3B82F6" class="w-full h-10 p-1 rounded-xl border border-gray-200 cursor-pointer">
+                    </div>
+                </div>
+
+                <div class="flex space-x-3 pt-2">
+                    <button type="button" onclick="closeCategoryModal()" class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl text-sm transition">ยกเลิก</button>
+                    <button type="submit" class="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl text-sm transition shadow-md">บันทึกหมวดหมู่</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Custom Modal / Notification Box -->
+    <div id="confirmModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-gray-100 text-center transform transition-all">
+            <div class="w-12 h-12 bg-rose-100 text-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="text-lg font-bold text-gray-800 mb-2">ยืนยันการลบข้อมูล</h3>
+            <p class="text-xs text-gray-500 mb-6">คุณแน่ใจหรือไม่ว่าต้องการลบรายการทั้งหมด? ข้อมูลที่ลบจะไม่สามารถกู้คืนได้</p>
+            <div class="flex space-x-3">
+                <button onclick="closeModal()" class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl text-sm transition">ยกเลิก</button>
+                <button onclick="executeClearAll()" class="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-xl text-sm transition shadow-md">ลบทั้งหมด</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // Initial Default Category Definitions
+        const defaultCategories = {
+            expense: [
+                { id: 'food', name: 'อาหาร & เครื่องดื่ม', icon: 'fa-utensils', color: '#EF4444' },
+                { id: 'transport', name: 'การเดินทาง / ค่าน้ำมัน', icon: 'fa-car', color: '#F59E0B' },
+                { id: 'shopping', name: 'ช้อปปิ้ง & ของใช้', icon: 'fa-bag-shopping', color: '#EC4899' },
+                { id: 'bills', name: 'ค่าน้ำ/ค่าไฟ/เน็ต', icon: 'fa-file-invoice-dollar', color: '#3B82F6' },
+                { id: 'entertainment', name: 'ความบันเทิง & ท่องเที่ยว', icon: 'fa-gamepad', color: '#8B5CF6' },
+                { id: 'health', name: 'สุขภาพ & พยาบาล', icon: 'fa-heart-pulse', color: '#10B981' },
+                { id: 'other_expense', name: 'ค่าใช้จ่ายอื่นๆ', icon: 'fa-ellipsis', color: '#6B7280' }
+            ],
+            income: [
+                { id: 'salary', name: 'เงินเดือน / ค่าจ้าง', icon: 'fa-money-bill-wave', color: '#10B981' },
+                { id: 'business', name: 'ธุรกิจส่วนตัว / ขายของ', icon: 'fa-store', color: '#06B6D4' },
+                { id: 'investment', name: 'การลงทุน / ดอกเบี้ย', icon: 'fa-chart-line', color: '#8B5CF6' },
+                { id: 'bonus', name: 'โบนัส / เงินพิเศษ', icon: 'fa-gift', color: '#F59E0B' },
+                { id: 'other_income', name: 'รายรับอื่นๆ', icon: 'fa-wallet', color: '#64748B' }
+            ]
+        };
+
+        let categories = JSON.parse(JSON.stringify(defaultCategories));
+
+        // State Management
+        let transactions = [];
+        let expenseChart = null;
+        let isAdmin = false;
+        let editingTransactionId = null;
+
+        // Initialize Application
+        window.onload = function() {
+            document.getElementById('date').valueAsDate = new Date();
+            loadCategories();
+            loadData();
+            updateCategories();
+            populateFilterCategories();
+            initChart();
+            updateDashboard();
+            renderTransactions();
+        };
+
+        // Toast Notification Function
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-rose-600' : 'bg-amber-600';
+            const icon = type === 'success' ? 'fa-circle-check' : type === 'error' ? 'fa-circle-xmark' : 'fa-circle-info';
+            
+            toast.className = `pointer-events-auto flex items-center space-x-2 text-white text-xs sm:text-sm px-4 py-3 rounded-2xl shadow-xl ${bgClass} transition-all duration-300 transform translate-y-2 opacity-0`;
+            toast.innerHTML = `<i class="fa-solid ${icon} text-base"></i><span>${message}</span>`;
+            
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Admin Management Logic
+        function openAdminModal() {
+            if (isAdmin) {
+                // Logout Admin
+                isAdmin = false;
+                document.getElementById('adminPanel').classList.add('hidden');
+                document.getElementById('adminBadge').classList.add('hidden');
+                document.getElementById('adminBadge').classList.remove('flex');
+                document.getElementById('adminBtnText').textContent = 'เข้าสู่ระบบแอดมิน';
+                document.getElementById('adminToggleBtn').classList.remove('bg-amber-500/30', 'border-amber-400');
+                showToast('ออกจากระบบแอดมินแล้ว', 'info');
+                renderTransactions();
+            } else {
+                document.getElementById('adminPassword').value = '';
+                document.getElementById('adminModal').classList.remove('hidden');
+            }
+        }
+
+        function closeAdminModal() {
+            document.getElementById('adminModal').classList.add('hidden');
+        }
+
+        function handleAdminLogin(e) {
+            e.preventDefault();
+            const pass = document.getElementById('adminPassword').value;
+            if (pass === '123456') {
+                isAdmin = true;
+                closeAdminModal();
+                document.getElementById('adminPanel').classList.remove('hidden');
+                document.getElementById('adminBadge').classList.remove('hidden');
+                document.getElementById('adminBadge').classList.add('flex');
+                document.getElementById('adminBtnText').textContent = 'ออกจากระบบแอดมิน';
+                document.getElementById('adminToggleBtn').classList.add('bg-amber-500/30', 'border-amber-400');
+                renderAdminCategories();
+                renderTransactions();
+                showToast('เข้าสู่โหมดแอดมินสำเร็จ!', 'success');
+            } else {
+                showToast('รหัสผ่านไม่ถูกต้อง!', 'error');
+            }
+        }
+
+        // Category LocalStorage Load & Save
+        function saveCategories() {
+            localStorage.setItem('smart_tracker_categories', JSON.stringify(categories));
+            updateCategories();
+            populateFilterCategories();
+            if (isAdmin) renderAdminCategories();
+        }
+
+        function loadCategories() {
+            const saved = localStorage.getItem('smart_tracker_categories');
+            if (saved) {
+                try {
+                    categories = JSON.parse(saved);
+                } catch(e) {
+                    categories = JSON.parse(JSON.stringify(defaultCategories));
+                }
+            }
+        }
+
+        function renderAdminCategories() {
+            const incContainer = document.getElementById('adminIncomeCats');
+            const expContainer = document.getElementById('adminExpenseCats');
+            incContainer.innerHTML = '';
+            expContainer.innerHTML = '';
+
+            categories.income.forEach(cat => {
+                incContainer.appendChild(createAdminCatBadge(cat, 'income'));
+            });
+
+            categories.expense.forEach(cat => {
+                expContainer.appendChild(createAdminCatBadge(cat, 'expense'));
+            });
+        }
+
+        function createAdminCatBadge(cat, type) {
+            const div = document.createElement('div');
+            div.className = 'inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-medium bg-gray-50';
+            div.innerHTML = `
+                <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${cat.color}"></span>
+                <i class="fa-solid ${cat.icon} text-gray-500"></i>
+                <span class="text-gray-700">${cat.name}</span>
+                <button onclick="editCategory('${cat.id}', '${type}')" class="text-amber-600 hover:text-amber-800 ml-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                <button onclick="deleteCategory('${cat.id}', '${type}')" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-xmark text-xs"></i></button>
+            `;
+            return div;
+        }
+
+        function openCategoryModal(cat = null, type = 'expense') {
+            document.getElementById('editCatId').value = cat ? cat.id : '';
+            document.getElementById('catType').value = type;
+            document.getElementById('catName').value = cat ? cat.name : '';
+            document.getElementById('catIcon').value = cat ? cat.icon : 'fa-tag';
+            document.getElementById('catColor').value = cat ? cat.color : '#3B82F6';
+            document.getElementById('catModalTitle').querySelector('span').textContent = cat ? 'แก้ไขหมวดหมู่' : 'เพิ่มหมวดหมู่ใหม่';
+            document.getElementById('categoryModal').classList.remove('hidden');
+        }
+
+        function closeCategoryModal() {
+            document.getElementById('categoryModal').classList.add('hidden');
+        }
+
+        function saveCategory(e) {
+            e.preventDefault();
+            const id = document.getElementById('editCatId').value;
+            const type = document.getElementById('catType').value;
+            const name = document.getElementById('catName').value.trim();
+            const icon = document.getElementById('catIcon').value;
+            const color = document.getElementById('catColor').value;
+
+            if (!name) return;
+
+            if (id) {
+                // Update existing
+                const catObj = categories[type].find(c => c.id === id);
+                if (catObj) {
+                    catObj.name = name;
+                    catObj.icon = icon;
+                    catObj.color = color;
+                }
+            } else {
+                // Add new
+                const newId = 'cat_' + Date.now();
+                categories[type].push({ id: newId, name, icon, color });
+            }
+
+            saveCategories();
+            closeCategoryModal();
+            updateDashboard();
+            renderTransactions();
+            showToast('บันทึกหมวดหมู่เรียบร้อยแล้ว', 'success');
+        }
+
+        function editCategory(id, type) {
+            const cat = categories[type].find(c => c.id === id);
+            if (cat) openCategoryModal(cat, type);
+        }
+
+        function deleteCategory(id, type) {
+            if (categories[type].length <= 1) {
+                showToast('ต้องมีอย่างน้อย 1 หมวดหมู่', 'error');
+                return;
+            }
+            categories[type] = categories[type].filter(c => c.id !== id);
+            saveCategories();
+            updateDashboard();
+            renderTransactions();
+            showToast('ลบหมวดหมู่แล้ว', 'info');
+        }
+
+        // Save & Load LocalStorage for Transactions
+        function saveData() {
+            localStorage.setItem('smart_tracker_transactions', JSON.stringify(transactions));
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('smart_tracker_transactions');
+            if (saved) {
+                try { transactions = JSON.parse(saved); } catch(e) { transactions = []; }
+            } else {
+                loadSampleData(false);
+            }
+        }
+
+        function loadSampleData(notify = true) {
+            transactions = [
+                { id: '1', type: 'income', amount: 45000, category: 'salary', note: 'เงินเดือนประจำเดือน', date: getFormattedDate(0) },
+                { id: '2', type: 'expense', amount: 350, category: 'food', note: 'มื้อเย็นร้านบุฟเฟต์', date: getFormattedDate(0) },
+                { id: '3', type: 'expense', amount: 1500, category: 'bills', note: 'ค่าไฟฟ้าและน้ำประปา', date: getFormattedDate(1) },
+                { id: '4', type: 'expense', amount: 890, category: 'shopping', note: 'ซื้อเสื้อผ้าใหม่', date: getFormattedDate(2) },
+                { id: '5', type: 'income', amount: 3500, category: 'business', note: 'ขายสินค้าออนไลน์', date: getFormattedDate(3) }
+            ];
+            saveData();
+            updateDashboard();
+            renderTransactions();
+            if (notify) showToast('โหลดข้อมูลตัวอย่างเรียบร้อยแล้ว', 'success');
+        }
+
+        function getFormattedDate(daysAgo = 0) {
+            const d = new Date();
+            d.setDate(d.getDate() - daysAgo);
+            return d.toISOString().split('T')[0];
+        }
+
+        function updateCategories() {
+            const type = document.querySelector('input[name="type"]:checked').value;
+            const categorySelect = document.getElementById('category');
+            categorySelect.innerHTML = '';
+
+            if (categories[type]) {
+                categories[type].forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.id;
+                    option.textContent = cat.name;
+                    categorySelect.appendChild(option);
+                });
+            }
+        }
+
+        function populateFilterCategories() {
+            const filterCat = document.getElementById('filterCategory');
+            filterCat.innerHTML = '<option value="all">ทุกหมวดหมู่</option>';
+
+            const allCats = [...categories.expense, ...categories.income];
+            allCats.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.id;
+                option.textContent = cat.name;
+                filterCat.appendChild(option);
+            });
+        }
+
+        // Add or Edit Transaction
+        function addTransaction(e) {
+            e.preventDefault();
+
+            const type = document.querySelector('input[name="type"]:checked').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const category = document.getElementById('category').value;
+            const date = document.getElementById('date').value;
+            const note = document.getElementById('note').value.trim();
+
+            if (!amount || amount <= 0 || !date) return;
+
+            if (editingTransactionId) {
+                // Update Transaction
+                const t = transactions.find(item => item.id === editingTransactionId);
+                if (t) {
+                    t.type = type;
+                    t.amount = amount;
+                    t.category = category;
+                    t.date = date;
+                    t.note = note || (type === 'income' ? 'รายรับ' : 'รายจ่าย');
+                }
+                showToast('อัปเดตรายการเรียบร้อยแล้ว', 'success');
+            } else {
+                // Add New Transaction
+                const newTransaction = {
+                    id: Date.now().toString(),
+                    type,
+                    amount,
+                    category,
+                    date,
+                    note: note || (type === 'income' ? 'รายรับ' : 'รายจ่าย')
+                };
+                transactions.unshift(newTransaction);
+                showToast('บันทึกรายการใหม่สำเร็จ', 'success');
+            }
+
+            saveData();
+            resetForm();
+            updateDashboard();
+            renderTransactions();
+        }
+
+        function startEditTransaction(id) {
+            const t = transactions.find(item => item.id === id);
+            if (!t) return;
+
+            editingTransactionId = id;
+            document.querySelector(`input[name="type"][value="${t.type}"]`).checked = true;
+            updateCategories();
+            document.getElementById('amount').value = t.amount;
+            document.getElementById('category').value = t.category;
+            document.getElementById('date').value = t.date;
+            document.getElementById('note').value = t.note;
+
+            document.getElementById('submitBtnText').textContent = 'บันทึกการแก้ไข';
+            document.getElementById('cancelEditBtn').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function resetForm() {
+            editingTransactionId = null;
+            document.getElementById('amount').value = '';
+            document.getElementById('note').value = '';
+            document.getElementById('submitBtnText').textContent = 'บันทึกข้อมูล';
+            document.getElementById('cancelEditBtn').classList.add('hidden');
+        }
+
+        function deleteTransaction(id) {
+            transactions = transactions.filter(t => t.id !== id);
+            saveData();
+            updateDashboard();
+            renderTransactions();
+            showToast('ลบรายการเรียบร้อยแล้ว', 'info');
+        }
+
+        function updateDashboard() {
+            let income = 0;
+            let expense = 0;
+
+            transactions.forEach(t => {
+                if (t.type === 'income') income += t.amount;
+                if (t.type === 'expense') expense += t.amount;
+            });
+
+            const balance = income - expense;
+
+            document.getElementById('totalBalance').textContent = `฿${balance.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+            document.getElementById('totalIncome').textContent = `+฿${income.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+            document.getElementById('totalExpense').textContent = `-฿${expense.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+
+            const balanceEl = document.getElementById('totalBalance');
+            if (balance < 0) {
+                balanceEl.classList.remove('text-gray-900', 'text-emerald-600');
+                balanceEl.classList.add('text-rose-600');
+            } else {
+                balanceEl.classList.remove('text-rose-600');
+                balanceEl.classList.add('text-gray-900');
+            }
+
+            updateChart();
+        }
+
+        function renderTransactions() {
+            const listEl = document.getElementById('transactionList');
+            const emptyEl = document.getElementById('emptyState');
+            const filterType = document.getElementById('filterType').value;
+            const filterCategory = document.getElementById('filterCategory').value;
+            const searchText = document.getElementById('searchInput').value.toLowerCase();
+
+            listEl.innerHTML = '';
+
+            const filtered = transactions.filter(t => {
+                const matchType = filterType === 'all' || t.type === filterType;
+                const matchCategory = filterCategory === 'all' || t.category === filterCategory;
+                const matchSearch = t.note.toLowerCase().includes(searchText) || getCategoryName(t.category).toLowerCase().includes(searchText);
+                return matchType && matchCategory && matchSearch;
+            });
+
+            if (filtered.length === 0) {
+                emptyEl.classList.remove('hidden');
+                return;
+            } else {
+                emptyEl.classList.add('hidden');
+            }
+
+            filtered.forEach(item => {
+                const catObj = getCategoryObject(item.category);
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50/60 transition group';
+
+                const isIncome = item.type === 'income';
+                const amountFormatted = `${isIncome ? '+' : '-'}฿${item.amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+
+                const adminEditAction = isAdmin ? `
+                    <button onclick="startEditTransaction('${item.id}')" class="text-amber-500 hover:text-amber-700 p-1.5 rounded-lg hover:bg-amber-50 transition mr-1" title="แก้ไขรายการ">
+                        <i class="fa-regular fa-pen-to-square text-sm"></i>
+                    </button>
+                ` : '';
+
+                tr.innerHTML = `
+                    <td class="py-3.5 px-4 text-gray-500 whitespace-nowrap text-xs sm:text-sm">
+                        ${formatThaiDate(item.date)}
+                    </td>
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${isIncome ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                            <i class="fa-solid ${isIncome ? 'fa-arrow-down-left mr-1.5' : 'fa-arrow-up-right mr-1.5'} text-[10px]"></i>
+                            ${isIncome ? 'รายรับ' : 'รายจ่าย'}
+                        </span>
+                    </td>
+                    <td class="py-3.5 px-4 text-gray-700 whitespace-nowrap">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-7 h-7 rounded-lg flex items-center justify-center text-xs text-white shadow-sm" style="background-color: ${catObj.color || '#6B7280'}">
+                                <i class="fa-solid ${catObj.icon || 'fa-tag'}"></i>
+                            </span>
+                            <span class="font-medium text-xs sm:text-sm">${catObj.name || item.category}</span>
+                        </div>
+                    </td>
+                    <td class="py-3.5 px-4 text-gray-600 max-w-xs truncate text-xs sm:text-sm">
+                        ${escapeHtml(item.note)}
+                    </td>
+                    <td class="py-3.5 px-4 text-right font-semibold whitespace-nowrap text-xs sm:text-sm ${isIncome ? 'text-emerald-600' : 'text-rose-600'}">
+                        ${amountFormatted}
+                    </td>
+                    <td class="py-3.5 px-4 text-center whitespace-nowrap">
+                        ${adminEditAction}
+                        <button onclick="deleteTransaction('${item.id}')" class="text-gray-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition" title="ลบรายการ">
+                            <i class="fa-regular fa-trash-can text-sm"></i>
+                        </button>
+                    </td>
+                `;
+                listEl.appendChild(tr);
+            });
+        }
+
+        function getCategoryObject(catId) {
+            const all = [...categories.expense, ...categories.income];
+            return all.find(c => c.id === catId) || { name: catId, icon: 'fa-tag', color: '#6B7280' };
+        }
+
+        function getCategoryName(catId) {
+            return getCategoryObject(catId).name;
+        }
+
+        function formatThaiDate(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+            return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear() + 543}`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            expenseChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [],
+                        borderWidth: 2,
+                        borderColor: '#ffffff',
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: { family: 'Kanit', size: 12 },
+                                padding: 16,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw || 0;
+                                    return ` ${context.label}: ฿${value.toLocaleString('th-TH', {minimumFractionDigits: 2})}`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '65%'
+                }
+            });
+        }
+
+        function updateChart() {
+            const expenseTotals = {};
+
+            transactions.filter(t => t.type === 'expense').forEach(t => {
+                if (expenseTotals[t.category]) {
+                    expenseTotals[t.category] += t.amount;
+                } else {
+                    expenseTotals[t.category] = t.amount;
+                }
+            });
+
+            const labels = [];
+            const data = [];
+            const bgColors = [];
+
+            Object.keys(expenseTotals).forEach(catId => {
+                const catObj = getCategoryObject(catId);
+                labels.push(catObj.name);
+                data.push(expenseTotals[catId]);
+                bgColors.push(catObj.color);
+            });
+
+            const noDataEl = document.getElementById('noChartData');
+
+            if (data.length === 0) {
+                noDataEl.classList.remove('hidden');
+                expenseChart.data.labels = [];
+                expenseChart.data.datasets[0].data = [];
+                expenseChart.update();
+            } else {
+                noDataEl.classList.add('hidden');
+                expenseChart.data.labels = labels;
+                expenseChart.data.datasets[0].data = data;
+                expenseChart.data.datasets[0].backgroundColor = bgColors;
+                expenseChart.update();
+            }
+        }
+
+        function exportCSV() {
+            if (transactions.length === 0) {
+                showToast('ไม่มีข้อมูลสำหรับส่งออก', 'error');
+                return;
+            }
+
+            let csvContent = "\uFEFFวันที่,ประเภท,หมวดหมู่,หมายเหตุ,จำนวนเงิน (บาท)\n";
+            transactions.forEach(t => {
+                const typeText = t.type === 'income' ? 'รายรับ' : 'รายจ่าย';
+                const catText = getCategoryName(t.category);
+                const noteText = `"${(t.note || '').replace(/"/g, '""')}"`;
+                csvContent += `${t.date},${typeText},${catText},${noteText},${t.amount}\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `income_expense_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast('ส่งออก CSV เรียบร้อยแล้ว', 'success');
+        }
+
+        function confirmClearAll() {
+            if (transactions.length === 0) return;
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('confirmModal').classList.add('hidden');
+        }
+
+        function executeClearAll() {
+            transactions = [];
+            saveData();
+            updateDashboard();
+            renderTransactions();
+            closeModal();
+            showToast('ล้างข้อมูลรายการทั้งหมดแล้ว', 'info');
+        }
+    </script>
+</body>
+</html>
